@@ -1,0 +1,41 @@
+{
+  "name": "stihirus-reader",
+  "version": "1.2.0",
+  "description": "Fetches author profile information and poems from stihirus.ru",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "LICENSE",
+    "README.md"
+  ],
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "node-fetch": "3.3.2"
+  },
+  "keywords": [
+    "stihirus",
+    "parser",
+    "api",
+    "reader",
+    "poems",
+    "poetry",
+    "author",
+    "profile",
+    "pagination",
+    "opex"
+  ],
+  "author": "t.me/OpexDev",
+  "license": "MIT"
+}
