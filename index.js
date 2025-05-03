@@ -18,23 +18,12 @@ const ERROR_CODES = {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * @param {string} message
- * @returns {number | null}
- */
 function extractStatusCode(message) {
     const match = message.match(/status:\s*(\d+)/);
     return match ? parseInt(match[1], 10) : null;
 }
 
-/**
- * @param {string} message
- * @param {number} code
- * @param {Error | null} [originalError=null]
- * @returns {import('./index.d.ts').StihirusError}
- */
 function createErrorObject(message, code, originalError = null) {
-    /** @type {import('./index.d.ts').StihirusError} */
     const errorObj = { code, message };
     if (originalError && originalError.message && originalError.message !== message) {
         if (!message.includes(originalError.message)) {
@@ -47,37 +36,17 @@ function createErrorObject(message, code, originalError = null) {
     return errorObj;
 }
 
-/**
- * @param {string} url
- * @param {string | null} [proxyUrl=null]
- * @param {string | null} [proxyApiKey=null]
- * @returns {Promise<string>}
- * @throws {Error & {statusCode?: number}}
- */
-async function fetchHtml(url, proxyUrl = null, proxyApiKey = null) {
+async function fetchHtml(url) {
     let response;
-    const targetUrl = proxyUrl ? `${proxyUrl}/proxy/${url}` : url;
     const headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Node.js) stihirus-reader/1.4.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
         'Connection': 'keep-alive',
-        'DNT': '1',
-        'Sec-GPC': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': proxyUrl ? 'cross-site' : 'same-site',
-        'Upgrade-Insecure-Requests': '1',
     };
 
-    if (proxyUrl && proxyApiKey) {
-        // @ts-ignore
-        headers['X-Proxy-Api-Key'] = proxyApiKey;
-    }
-
     try {
-        response = await fetch(targetUrl, {
-            // @ts-ignore
+        response = await fetch(url, {
             headers: headers,
             redirect: 'follow',
         });
@@ -85,73 +54,44 @@ async function fetchHtml(url, proxyUrl = null, proxyApiKey = null) {
         if (!response.ok) {
             let errorBody = '';
             try { errorBody = await response.text(); } catch (e) { /* ignore */ }
-            const errorMessage = `HTTP error! status: ${response.status} for ${targetUrl}. Body: ${errorBody.substring(0, 200)}`;
+            const errorMessage = `HTTP error! status: ${response.status} for ${url}. Body: ${errorBody.substring(0, 200)}`;
             const error = new Error(errorMessage);
-            // @ts-ignore
             error.statusCode = response.status;
             throw error;
         }
         return await response.text();
     } catch (error) {
-        // @ts-ignore
         if (!error.statusCode && !(error instanceof TypeError && error.message.includes('Invalid URL'))) {
-            // @ts-ignore
             error.statusCode = ERROR_CODES.NETWORK_ERROR;
         }
         throw error;
     }
 }
 
-/**
- * @param {string} endpoint
- * @param {Record<string, any>} data
- * @param {string} [refererUrl=BASE_URL + '/']
- * @param {string | null} [proxyUrl=null]
- * @param {string | null} [proxyApiKey=null]
- * @returns {Promise<any>}
- * @throws {Error & {statusCode?: number, apiStatus?: string}}
- */
-async function fetchApi(endpoint, data, refererUrl = BASE_URL + '/', proxyUrl = null, proxyApiKey = null) {
-    const originalApiUrl = `${API_BASE_URL}/${endpoint}`;
-    const targetUrl = proxyUrl ? `${proxyUrl}/proxy/${originalApiUrl}` : originalApiUrl;
+async function fetchApi(endpoint, data, refererUrl = BASE_URL + '/') {
+    const apiUrl = `${API_BASE_URL}/${endpoint}`;
     let response;
     let originUrl = BASE_URL;
 
-    if (!proxyUrl) {
-        try {
-            const parsedReferer = new URL(refererUrl);
-            originUrl = parsedReferer.origin;
-        } catch (e) {
-            originUrl = BASE_URL;
-        }
+    try {
+        const parsedReferer = new URL(refererUrl);
+        originUrl = parsedReferer.origin;
+    } catch (e) {
+        originUrl = BASE_URL;
     }
 
     const headers = {
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Node.js) stihirus-reader/1.4.0',
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'X-Requested-With': 'XMLHttpRequest',
-        'DNT': '1',
-        'Sec-GPC': '1',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': proxyUrl ? 'cross-site' : 'same-site',
+        'Origin': originUrl,
+        'Referer': refererUrl,
     };
 
-    if (proxyUrl && proxyApiKey) {
-        // @ts-ignore
-        headers['X-Proxy-Api-Key'] = proxyApiKey;
-    } else {
-        // @ts-ignore
-        headers['Origin'] = originUrl;
-        // @ts-ignore
-        headers['Referer'] = refererUrl;
-    }
-
     try {
-        response = await fetch(targetUrl, {
+        response = await fetch(apiUrl, {
             method: 'POST',
-            // @ts-ignore
             headers: headers,
             body: new URLSearchParams(data).toString(),
         });
@@ -159,9 +99,8 @@ async function fetchApi(endpoint, data, refererUrl = BASE_URL + '/', proxyUrl = 
         if (!response.ok) {
              let errorBody = '';
              try { errorBody = await response.text(); } catch (e) { /* ignore */ }
-             const errorMessage = `API error! status: ${response.status} for ${targetUrl}. Body: ${errorBody.substring(0,200)}`;
+             const errorMessage = `API error! status: ${response.status} for ${apiUrl}. Body: ${errorBody.substring(0,200)}`;
              const error = new Error(errorMessage);
-             // @ts-ignore
              error.statusCode = response.status;
              throw error;
         }
@@ -174,41 +113,29 @@ async function fetchApi(endpoint, data, refererUrl = BASE_URL + '/', proxyUrl = 
         if (result.status !== 'success' && !(isPoemFetch && Array.isArray(result.data)) && !isFilterFetch) {
              const errorMessage = `API returned status: ${result.status}. Message: ${result.message || 'No message'}`;
              const error = new Error(errorMessage);
-             // @ts-ignore
              error.statusCode = ERROR_CODES.API_ERROR;
-             // @ts-ignore
              error.apiStatus = result.status;
              throw error;
         }
         if (isFilterFetch && result.status === 'success' && (!result.razd || !result.year_month)) {
              const errorMessage = `API for filters returned success but missing 'razd' or 'year_month' arrays.`;
              const error = new Error(errorMessage);
-             // @ts-ignore
              error.statusCode = ERROR_CODES.PARSING_ERROR;
              throw error;
         }
 
         return result;
     } catch (error) {
-        // @ts-ignore
         if (!error.statusCode) {
-            // @ts-ignore
             error.statusCode = error.message.includes('API returned status') ? ERROR_CODES.API_ERROR : ERROR_CODES.NETWORK_ERROR;
         }
         throw error;
     }
 }
 
-/**
- * @param {number} authorId
- * @param {string} [authorPageUrl=BASE_URL + '/']
- * @param {string | null} [proxyUrl=null]
- * @param {string | null} [proxyApiKey=null]
- * @returns {Promise<string | null>}
- */
-async function fetchUsernameForId(authorId, authorPageUrl = BASE_URL + '/', proxyUrl = null, proxyApiKey = null) {
+async function fetchUsernameForId(authorId, authorPageUrl = BASE_URL + '/') {
     try {
-        const apiResponse = await fetchApi('pr_read_avtor', { id: authorId, from: 0 }, authorPageUrl, proxyUrl, proxyApiKey);
+        const apiResponse = await fetchApi('pr_read_avtor', { id: authorId, from: 0 }, authorPageUrl);
         if (apiResponse.data && apiResponse.data.length > 0 && apiResponse.data[0].useruri) {
             return apiResponse.data[0].useruri;
         }
@@ -218,18 +145,13 @@ async function fetchUsernameForId(authorId, authorPageUrl = BASE_URL + '/', prox
     }
 }
 
-/**
- * @param {string} html
- * @returns {{ authorId: number | null; usernameFromHtml: string | null; description: string; avatarUrl: string | null; headerUrl: string | null; stats: import('./index.d.ts').StihirusAuthorStats; collections: import('./index.d.ts').StihirusCollectionInfo[]; lastVisit: string; status: string; }}
- * @throws {Error & {statusCode?: number}}
- */
 function parseAuthorInfoFromHtml(html) {
     try {
         const $ = cheerio.load(html);
         const info = {
             authorId: null, usernameFromHtml: null, description: '', avatarUrl: null, headerUrl: null,
             stats: { poems: 0, reviewsSent: 0, reviewsReceived: 0 },
-            collections: [], lastVisit: '', status: '',
+            collections: [], lastVisit: '', status: '', isPremium: false,
         };
 
         const authorIdStr = $('.avtorinfo.page_avatar').attr('data-userid');
@@ -275,9 +197,9 @@ function parseAuthorInfoFromHtml(html) {
         if (statsCard.length) {
             const pBars = statsCard.find('.progress-bar');
             const txt = statsCard.find('.card-text').text();
-            info.stats.poems = parseInt(txt.match(/Произведений\s*([\d]+)/)?.[1] ?? $(pBars[0]).attr('aria-valuenow') ?? '0', 10);
-            info.stats.reviewsSent = parseInt(txt.match(/Написано отзывов\s*([\d]+)/)?.[1] ?? $(pBars[1]).attr('aria-valuenow') ?? '0', 10);
-            info.stats.reviewsReceived = parseInt(txt.match(/Получено отзывов\s*([\d]+)/)?.[1] ?? $(pBars[2]).attr('aria-valuenow') ?? '0', 10);
+            info.stats.poems = parseInt(txt.match(/Произведений\s*([\d]+)/)?.[1] ?? pBars[0]?.attr('aria-valuenow') ?? '0', 10);
+            info.stats.reviewsSent = parseInt(txt.match(/Написано отзывов\s*([\d]+)/)?.[1] ?? pBars[1]?.attr('aria-valuenow') ?? '0', 10);
+            info.stats.reviewsReceived = parseInt(txt.match(/Получено отзывов\s*([\d]+)/)?.[1] ?? pBars[2]?.attr('aria-valuenow') ?? '0', 10);
         }
 
         $('#show_sborniki a.list-group-item').each((_, el) => {
@@ -296,26 +218,43 @@ function parseAuthorInfoFromHtml(html) {
             }
         });
 
-        $('.card-footer .small.text-muted').each((_, el) => {
+        $('.card-footer .small').each((_, el) => {
             const text = $(el).text().trim();
-            if (text.startsWith('Последний визит:')) info.lastVisit = text.replace('Последний визит:', '').trim();
-            else if (text.startsWith('Статус:')) info.status = $(el).find('b').text().trim() || text.replace('Статус:', '').trim();
+            if (text.startsWith('Последний визит:')) {
+                 info.lastVisit = text.replace('Последний визит:', '').trim();
+            } else if (text.startsWith('Статус:')) {
+                 info.status = $(el).find('b').text().trim() || text.replace('Статус:', '').trim();
+            } else if (text.includes('Премиум доступ')) {
+                 info.isPremium = true;
+            }
         });
 
         return info;
     } catch (error) {
         const parseError = new Error("Failed to parse author page HTML.");
-        // @ts-ignore
         parseError.statusCode = ERROR_CODES.PARSING_ERROR;
         throw parseError;
     }
 }
 
-/**
- * @param {any} poem
- * @returns {import('./index.d.ts').StihirusPoem}
- */
 function mapApiPoem(poem) {
+    const gifts = poem.podarki ? poem.podarki.split(',').map(g => g.trim()).filter(g => g) : [];
+    const uniquenessStatus = parseInt(poem.text_unique ?? '-1', 10);
+
+    let contest = null;
+    if (poem.contest_id && poem.contest_name) {
+        contest = { id: parseInt(poem.contest_id, 10), name: poem.contest_name };
+    }
+
+    let holidaySection = null;
+    if (poem.prazdel_id && poem.prazd_title) {
+        holidaySection = {
+            id: parseInt(poem.prazdel_id, 10),
+            url: poem.prazd_url ? `${BASE_URL}/prazdel/${poem.prazd_url}` : null,
+            title: poem.prazd_title
+        };
+    }
+
     return {
         id: parseInt(poem.id, 10),
         title: poem.title || '***',
@@ -330,24 +269,21 @@ function mapApiPoem(poem) {
         commentsCount: parseInt(poem.comments_count || '0', 10),
         imageUrl: poem.background ? (poem.background.startsWith('/') ? `${BASE_URL}${poem.background}` : poem.background) : null,
         hasCertificate: poem.have_certificate === '1',
+        gifts: gifts,
+        uniquenessStatus: uniquenessStatus,
+        contest: contest,
+        holidaySection: holidaySection,
     };
 }
 
-/**
- * @param {string | number} identifier
- * @param {string | null} [proxyUrl=null]
- * @param {string | null} [proxyApiKey=null]
- * @returns {Promise<{authorId: number; username: string; authorPageUrl: string}>}
- * @throws {import('./index.d.ts').StihirusError}
- */
-async function resolveIdentifier(identifier, proxyUrl = null, proxyApiKey = null) {
+async function resolveIdentifier(identifier) {
     let authorId = null;
     let username = null;
     let authorPageUrl = null;
 
     if (typeof identifier === 'number') {
         authorId = identifier;
-        username = await fetchUsernameForId(authorId, BASE_URL + '/', proxyUrl, proxyApiKey);
+        username = await fetchUsernameForId(authorId, BASE_URL + '/');
         if (!username) throw createErrorObject(`Could not find username for author ID ${authorId}.`, ERROR_CODES.NOT_FOUND);
         authorPageUrl = `https://${username}.stihirus.ru/`;
     } else if (typeof identifier === 'string') {
@@ -381,7 +317,7 @@ async function resolveIdentifier(identifier, proxyUrl = null, proxyApiKey = null
                 throw createErrorObject(`Unrecognized URL format: ${identifier}`, ERROR_CODES.INVALID_INPUT);
             }
             try {
-                 const html = await fetchHtml(authorPageUrl, proxyUrl, proxyApiKey);
+                 const html = await fetchHtml(authorPageUrl);
                  const info = parseAuthorInfoFromHtml(html);
                  if (!info.authorId) throw new Error('Could not parse authorId from page');
                  authorId = info.authorId;
@@ -389,7 +325,7 @@ async function resolveIdentifier(identifier, proxyUrl = null, proxyApiKey = null
                  if (authorPageUrl.includes(`${username}.stihirus.ru`)) {
                      const fallbackUrl = `${BASE_URL}/avtor/${username}`;
                      try {
-                         const fallbackHtml = await fetchHtml(fallbackUrl, proxyUrl, proxyApiKey);
+                         const fallbackHtml = await fetchHtml(fallbackUrl);
                          const fallbackInfo = parseAuthorInfoFromHtml(fallbackHtml);
                          if (!fallbackInfo.authorId) throw new Error('Could not parse authorId from fallback page');
                          authorId = fallbackInfo.authorId;
@@ -408,14 +344,14 @@ async function resolveIdentifier(identifier, proxyUrl = null, proxyApiKey = null
                 username = identifier;
                 authorPageUrl = `https://${username}.stihirus.ru/`;
                  try {
-                     const html = await fetchHtml(authorPageUrl, proxyUrl, proxyApiKey);
+                     const html = await fetchHtml(authorPageUrl);
                      const info = parseAuthorInfoFromHtml(html);
                      if (!info.authorId) throw new Error('Could not parse authorId from page');
                      authorId = info.authorId;
                  } catch(err) {
                      const fallbackUrl = `${BASE_URL}/avtor/${username}`;
                      try {
-                         const fallbackHtml = await fetchHtml(fallbackUrl, proxyUrl, proxyApiKey);
+                         const fallbackHtml = await fetchHtml(fallbackUrl);
                          const fallbackInfo = parseAuthorInfoFromHtml(fallbackHtml);
                          if (!fallbackInfo.authorId) throw new Error('Could not parse authorId from fallback page');
                          authorId = fallbackInfo.authorId;
@@ -441,23 +377,11 @@ async function resolveIdentifier(identifier, proxyUrl = null, proxyApiKey = null
 }
 
 
-/**
- * Asynchronously fetches author data from stihirus.ru.
- * Can be used in Node.js or browser environments (requires CORS proxy for browser).
- *
- * @param {string | number} identifier - Author identifier (ID, username, subdomain URL, or path URL).
- * @param {number | null} [page=null] - Optional. Controls poem fetching: `null` (default) = all poems, `0` = profile only, `N > 0` = specific page N.
- * @param {number} [requestDelayMs=DEFAULT_REQUEST_DELAY_MS] - Optional. Delay between API calls when fetching all pages (`page = null`). Defaults to 500ms.
- * @param {string | null} [proxyUrl=null] - Optional. URL of the CORS proxy (e.g., 'https://your-proxy.com'). Required for browser usage.
- * @param {string | null} [proxyApiKey=null] - Optional. API key for the CORS proxy, if required. Sent as 'X-Proxy-Api-Key' header.
- * @returns {Promise<import('./index.d.ts').StihirusResponse>} A promise resolving to `StihirusResponse`. Check `status` field.
- */
-export async function getAuthorData(identifier, page = null, requestDelayMs = DEFAULT_REQUEST_DELAY_MS, proxyUrl = null, proxyApiKey = null) {
+export async function getAuthorData(identifier, page = null, requestDelayMs = DEFAULT_REQUEST_DELAY_MS, filterOptions = null) {
     let authorId = null;
     let username = null;
     let authorPageUrl = null;
     let parsedInfo = null;
-    /** @type {any[]} */
     const fetchedPoems = [];
 
     try {
@@ -468,29 +392,35 @@ export async function getAuthorData(identifier, page = null, requestDelayMs = DE
             requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
         }
 
-        const resolved = await resolveIdentifier(identifier, proxyUrl, proxyApiKey);
+        const resolved = await resolveIdentifier(identifier);
         authorId = resolved.authorId;
         username = resolved.username;
         authorPageUrl = resolved.authorPageUrl;
 
         try {
-            const authorHtml = await fetchHtml(authorPageUrl, proxyUrl, proxyApiKey);
+            const authorHtml = await fetchHtml(authorPageUrl);
             parsedInfo = parseAuthorInfoFromHtml(authorHtml);
             if (parsedInfo.authorId && parsedInfo.authorId !== authorId) {
                  // console.warn(`Resolved ID (${authorId}) differs from final page ID (${parsedInfo.authorId}). Using resolved ID.`);
             }
         } catch (error) {
-             // @ts-ignore
              const statusCode = error.statusCode || extractStatusCode(error.message) || ERROR_CODES.HTTP_ERROR;
              throw createErrorObject(`Failed to fetch or parse final author page ${authorPageUrl}: ${error.message}`, statusCode, error instanceof Error ? error : null);
         }
+
+        const apiParamsBase = { id: authorId };
+        if (filterOptions?.rubricId) apiParamsBase.razdel_id = filterOptions.rubricId;
+        if (filterOptions?.year) apiParamsBase.year = filterOptions.year;
+        if (filterOptions?.month) apiParamsBase.month = filterOptions.month;
+
 
         if (page === null) {
             let from = 0;
             let keepFetching = true;
             while (keepFetching) {
                 try {
-                    const apiResponse = await fetchApi('pr_read_avtor', { id: authorId, from: from }, authorPageUrl, proxyUrl, proxyApiKey);
+                    const apiParams = { ...apiParamsBase, from: from };
+                    const apiResponse = await fetchApi('pr_read_avtor', apiParams, authorPageUrl);
                     if (apiResponse && Array.isArray(apiResponse.data)) {
                         const poems = apiResponse.data;
                         if (poems.length > 0) {
@@ -511,7 +441,8 @@ export async function getAuthorData(identifier, page = null, requestDelayMs = DE
         } else if (page > 0) {
             const from = (page - 1) * POEMS_PER_PAGE;
             try {
-                const apiResponse = await fetchApi('pr_read_avtor', { id: authorId, from: from }, authorPageUrl, proxyUrl, proxyApiKey);
+                const apiParams = { ...apiParamsBase, from: from };
+                const apiResponse = await fetchApi('pr_read_avtor', apiParams, authorPageUrl);
                 if (apiResponse && Array.isArray(apiResponse.data)) {
                     fetchedPoems.push(...apiResponse.data);
                 }
@@ -523,11 +454,10 @@ export async function getAuthorData(identifier, page = null, requestDelayMs = DE
         const finalUsername = parsedInfo.usernameFromHtml || username;
         const finalPoemCount = parsedInfo.stats.poems;
 
-        if (finalPoemCount === 0 && fetchedPoems.length > 0 && page === null) {
+        if (finalPoemCount === 0 && fetchedPoems.length > 0 && page === null && !filterOptions) {
              parsedInfo.stats.poems = fetchedPoems.length;
         }
 
-        /** @type {import('./index.d.ts').StihirusAuthorData} */
         const successData = {
             authorId: authorId,
             username: finalUsername,
@@ -540,22 +470,19 @@ export async function getAuthorData(identifier, page = null, requestDelayMs = DE
             lastVisit: parsedInfo.lastVisit,
             stats: parsedInfo.stats,
             collections: parsedInfo.collections,
+            isPremium: parsedInfo.isPremium,
             poems: fetchedPoems.map(mapApiPoem),
         };
 
         return { status: 'success', data: successData };
 
     } catch (error) {
-        /** @type {import('./index.d.ts').StihirusError} */
         let finalError;
-        // @ts-ignore
         if (error && error.code && error.message && typeof error.code === 'number') {
-            // @ts-ignore
             finalError = error;
         } else {
             const errorMessage = (error instanceof Error ? error.message : String(error)) || 'An unknown error occurred.';
             let errorCode = ERROR_CODES.UNKNOWN_ERROR;
-            // @ts-ignore
             if (error && error.statusCode) errorCode = error.statusCode;
             if (error instanceof TypeError && error.message.includes('Invalid URL')) {
                 errorCode = ERROR_CODES.INVALID_INPUT;
@@ -566,25 +493,14 @@ export async function getAuthorData(identifier, page = null, requestDelayMs = DE
     }
 }
 
-
-/**
- * Asynchronously fetches available filter options (rubrics, dates) for an author's poems.
- * Can be used in Node.js or browser environments (requires CORS proxy for browser).
- *
- * @param {string | number} identifier - Author identifier (ID, username, subdomain URL, or path URL).
- * @param {string | null} [proxyUrl=null] - Optional. URL of the CORS proxy (e.g., 'https://your-proxy.com'). Required for browser usage.
- * @param {string | null} [proxyApiKey=null] - Optional. API key for the CORS proxy, if required. Sent as 'X-Proxy-Api-Key' header.
- * @returns {Promise<import('./index.d.ts').StihirusFiltersResponse>} A promise resolving to `StihirusFiltersResponse`. Check `status` field.
- */
-export async function getAuthorFilters(identifier, proxyUrl = null, proxyApiKey = null) {
+export async function getAuthorFilters(identifier) {
      try {
-        const resolved = await resolveIdentifier(identifier, proxyUrl, proxyApiKey);
+        const resolved = await resolveIdentifier(identifier);
         const authorId = resolved.authorId;
         const authorPageUrl = resolved.authorPageUrl;
 
-        const apiResponse = await fetchApi('pr_read_avtor_prozv_filter', { for_user_id: authorId }, authorPageUrl, proxyUrl, proxyApiKey);
+        const apiResponse = await fetchApi('pr_read_avtor_prozv_filter', { for_user_id: authorId }, authorPageUrl);
 
-        /** @type {import('./index.d.ts').StihirusAuthorFiltersData} */
         const filtersData = {
             rubrics: apiResponse.razd.map(r => ({
                 id: parseInt(r.id, 10),
@@ -601,16 +517,12 @@ export async function getAuthorFilters(identifier, proxyUrl = null, proxyApiKey 
         return { status: 'success', data: filtersData };
 
      } catch (error) {
-        /** @type {import('./index.d.ts').StihirusError} */
         let finalError;
-        // @ts-ignore
         if (error && error.code && error.message && typeof error.code === 'number') {
-            // @ts-ignore
             finalError = error;
         } else {
             const errorMessage = (error instanceof Error ? error.message : String(error)) || 'An unknown error occurred.';
             let errorCode = ERROR_CODES.UNKNOWN_ERROR;
-            // @ts-ignore
             if (error && error.statusCode) errorCode = error.statusCode;
              if (error instanceof TypeError && error.message.includes('Invalid URL')) {
                 errorCode = ERROR_CODES.INVALID_INPUT;
@@ -619,4 +531,272 @@ export async function getAuthorFilters(identifier, proxyUrl = null, proxyApiKey 
         }
         return { status: 'error', error: finalError };
      }
+}
+
+function parseHomepageAuthors(html, selector) {
+    const $ = cheerio.load(html);
+    const authors = [];
+    $(selector).find('.friends-window__friend-card').each((_, el) => {
+        const link = $(el).find('a');
+        const avatarDiv = $(el).find('.avatarimg');
+        const nameDiv = $(el).find('.friends-window__fname');
+        const badge = $(el).find('.u-badge');
+
+        const profileUrl = link.attr('href');
+        if (!profileUrl) return;
+
+        const fullProfileUrl = profileUrl.startsWith('http') ? profileUrl : `${BASE_URL}${profileUrl}`;
+        const usernameMatch = profileUrl.match(/\/avtor\/([^\/?]+)/);
+        const canonicalUsername = usernameMatch ? usernameMatch[1] : '';
+        const username = nameDiv.text().trim();
+
+        let avatarUrl = null;
+        const style = avatarDiv.attr('style');
+        if (style) {
+            const urlMatch = style.match(/url\(([^)]+)\)/);
+            if (urlMatch && urlMatch[1] && urlMatch[1] !== '/img/profile/none.jpg') {
+                 const rawUrl = urlMatch[1].replace(/['"]/g, '');
+                 avatarUrl = rawUrl.startsWith('//') ? `https:${rawUrl}` : (rawUrl.startsWith('/') ? `${BASE_URL}${rawUrl}` : rawUrl);
+            }
+        }
+
+        let poemsCount = null;
+        let rating = null;
+        const badgeTitle = badge.attr('title');
+        if (badgeTitle) {
+            const poemsMatch = badgeTitle.match(/произведений:\s*(\d+)/i);
+            if (poemsMatch) poemsCount = parseInt(poemsMatch[1], 10);
+            const ratingMatch = badgeTitle.match(/рейтинг произведений:\s*(\d+)/i);
+             if (ratingMatch) rating = parseInt(ratingMatch[1], 10);
+        } else {
+             const badgeText = badge.text().trim();
+             if (/^\d+$/.test(badgeText)) {
+                 if (selector === '.card-week-rating') rating = parseInt(badgeText, 10);
+                 else if (selector === '.card-recomended' || selector === '.card-active-avtors') poemsCount = parseInt(badgeText, 10);
+             }
+        }
+
+        authors.push({
+            username,
+            canonicalUsername,
+            profileUrl: fullProfileUrl,
+            avatarUrl,
+            poemsCount,
+            rating
+        });
+    });
+    return authors;
+}
+
+function parseHomepagePromoPoems(html) {
+     const $ = cheerio.load(html);
+     const poems = [];
+     $('.card-recomended-proizv .card-body > div.border-bottom').each((_, el) => {
+         const poemLink = $(el).find('span.link');
+         const authorDiv = $(el).find('.small.text-right');
+         const metaSpans = $(el).find('span.text-nowrap.small');
+
+         const poemIdMatch = poemLink.attr('onclick')?.match(/pr_open_proizv\(this\).*data-proizvid="(\d+)"/);
+         const poemId = poemIdMatch ? parseInt(poemIdMatch[1], 10) : null;
+         const title = poemLink.text().trim();
+         const authorUsername = authorDiv.text().trim();
+         const authorLinkElement = authorDiv.find('a');
+         let authorProfileUrl = `${BASE_URL}/avtor/${encodeURIComponent(authorUsername)}`;
+
+         if (authorLinkElement.length > 0) {
+             const href = authorLinkElement.attr('href');
+             if (href) {
+                 authorProfileUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+             }
+         }
+
+         if (!poemId || !title || !authorUsername) return;
+
+         let rating = null;
+         let commentsCount = null;
+
+         metaSpans.each((_, span) => {
+             const icon = $(span).find('i');
+             const text = $(span).text().trim();
+             if (icon.hasClass('fa-heart-o') || icon.hasClass('fa-heart')) {
+                 rating = parseInt(text, 10);
+             } else if (icon.hasClass('fa-comments-o')) {
+                 commentsCount = parseInt(text, 10);
+             }
+         });
+
+         poems.push({
+             id: poemId,
+             title: title,
+             url: `${BASE_URL}/proizv/${poemId}`,
+             authorUsername: authorUsername,
+             authorProfileUrl: authorProfileUrl,
+             rating: isNaN(rating) ? null : rating,
+             commentsCount: isNaN(commentsCount) ? null : commentsCount,
+         });
+     });
+     return poems;
+}
+
+export async function getRecommendedAuthors() {
+    try {
+        const html = await fetchHtml(BASE_URL);
+        const authors = parseHomepageAuthors(html, '.card-recomended');
+        return { status: 'success', data: authors };
+    } catch (error) {
+        const code = error.statusCode || ERROR_CODES.UNKNOWN_ERROR;
+        return { status: 'error', error: createErrorObject(error.message, code, error) };
+    }
+}
+
+export async function getPromoPoems() {
+     try {
+        const html = await fetchHtml(BASE_URL);
+        const poems = parseHomepagePromoPoems(html);
+        return { status: 'success', data: poems };
+    } catch (error) {
+        const code = error.statusCode || ERROR_CODES.UNKNOWN_ERROR;
+        return { status: 'error', error: createErrorObject(error.message, code, error) };
+    }
+}
+
+export async function getWeeklyRatedAuthors() {
+     try {
+        const html = await fetchHtml(BASE_URL);
+        const authors = parseHomepageAuthors(html, '.card-week-rating');
+        return { status: 'success', data: authors };
+    } catch (error) {
+        const code = error.statusCode || ERROR_CODES.UNKNOWN_ERROR;
+        return { status: 'error', error: createErrorObject(error.message, code, error) };
+    }
+}
+
+export async function getActiveAuthors() {
+     try {
+        const html = await fetchHtml(BASE_URL);
+        const authors = parseHomepageAuthors(html, '.card-active-avtors');
+        return { status: 'success', data: authors };
+    } catch (error) {
+        const code = error.statusCode || ERROR_CODES.UNKNOWN_ERROR;
+        return { status: 'error', error: createErrorObject(error.message, code, error) };
+    }
+}
+
+function parseSinglePoemPage(html, poemId) {
+     try {
+        const $ = cheerio.load(html);
+        const poemCard = $('.card1');
+        if (!poemCard.length) return null;
+
+        const title = poemCard.find('.proizv-window__bodytitle').first().text().trim() || '***';
+        const textContent = poemCard.find('.proizv-window__body').first();
+        textContent.find('div.link').remove();
+        const text = textContent.html()?.replace(/<br\s*\/?>/gi, '\n').trim() || '';
+
+        const header = poemCard.find('.proizv-window__header').first();
+        const authorLink = header.find('.proizv-window__title a').first();
+        let authorUsername = header.find('.proizv-window__title').first().text().trim();
+        let authorProfileUrl = null;
+        let authorId = null;
+
+        if (authorLink.length > 0) {
+            authorUsername = authorLink.text().trim();
+            const href = authorLink.attr('href');
+            if (href) {
+                authorProfileUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+            }
+        }
+
+        const authorAvatarStyle = header.find('.avatarimg').attr('style');
+        if (authorAvatarStyle) {
+            const idMatch = authorAvatarStyle.match(/profile\/(\d+)\.jpg/);
+            if (idMatch) authorId = parseInt(idMatch[1], 10);
+        }
+
+        const createdText = poemCard.find('.proizv-window__created').first().text().trim();
+
+        const metaBottom = poemCard.find('.proizv-window__bottom').first();
+        const rubricElement = metaBottom.find('.proizv-window__razdel').first();
+        const rubricLink = rubricElement.find('a').first();
+        let rubricName = '';
+        let fullRubricUrl = null;
+
+        if (rubricLink.length) {
+            rubricName = rubricLink.text().trim();
+            const rubricUrl = rubricLink.attr('href');
+            fullRubricUrl = rubricUrl && rubricUrl !== '#' ? (rubricUrl.startsWith('http') ? rubricUrl : `${BASE_URL}${rubricUrl}`) : null;
+        } else {
+             rubricName = rubricElement.contents().filter(function() {
+                return this.type === 'text';
+             }).text().trim().split(/©|\n/)[0].trim();
+             if (rubricName === 'Произведения без рубрики') fullRubricUrl = null;
+        }
+        if (!rubricName) rubricName = 'Без рубрики';
+
+        const collectionName = null;
+
+        const actions = poemCard.find('.proizv-window__actions').first();
+        const ratingSpan = actions.find('.proizv-window__like .rating_count');
+        const rating = ratingSpan.length ? parseInt(ratingSpan.text().trim(), 10) : 0;
+
+        const commentsCount = 0;
+
+        const imageUrl = poemCard.find('.proizv-window__body img').first().attr('src') || null;
+        const fullImageUrl = imageUrl ? (imageUrl.startsWith('/') ? `${BASE_URL}${imageUrl}` : imageUrl) : null;
+
+        const hasCertificate = actions.find('.proizv-window__certificate i').length > 0;
+
+        const gifts = [];
+        const uniquenessStatus = hasCertificate ? 1 : 0;
+
+        const poemData = {
+            id: poemId,
+            title: title,
+            text: text,
+            created: createdText,
+            rubric: { name: rubricName, url: fullRubricUrl },
+            collection: collectionName,
+            rating: isNaN(rating) ? 0 : rating,
+            commentsCount: commentsCount,
+            imageUrl: fullImageUrl,
+            hasCertificate: hasCertificate,
+            gifts: gifts,
+            uniquenessStatus: uniquenessStatus,
+            author: authorId && authorUsername && authorProfileUrl ? {
+                id: authorId,
+                username: authorUsername,
+                profileUrl: authorProfileUrl
+            } : null,
+        };
+
+        return poemData;
+
+     } catch (error) {
+        console.error(`Error parsing single poem page (ID: ${poemId}):`, error);
+        throw createErrorObject(`Failed to parse poem page HTML for ID ${poemId}`, ERROR_CODES.PARSING_ERROR, error);
+     }
+}
+
+export async function getPoemById(poemId) {
+    if (typeof poemId !== 'number' || !Number.isInteger(poemId) || poemId <= 0) {
+        return { status: 'error', error: createErrorObject('Invalid poem ID provided.', ERROR_CODES.INVALID_INPUT) };
+    }
+    const poemUrl = `${BASE_URL}/proizv/${poemId}`;
+    try {
+        const html = await fetchHtml(poemUrl);
+        const poemData = parseSinglePoemPage(html, poemId);
+
+        if (!poemData) {
+             throw createErrorObject(`Poem content not found or could not be parsed on page ${poemUrl}`, ERROR_CODES.PARSING_ERROR);
+        }
+
+        return { status: 'success', data: poemData };
+    } catch (error) {
+        let code = error.code || error.statusCode || ERROR_CODES.UNKNOWN_ERROR;
+        if (error.originalMessage?.includes('status: 404') || error.message?.includes('status: 404') || error.statusCode === 404) {
+            code = ERROR_CODES.NOT_FOUND;
+        }
+        const message = error.code ? error.message : `Failed to fetch or parse poem ID ${poemId}: ${error.message}`;
+        return { status: 'error', error: createErrorObject(message, code, error instanceof Error ? error : null) };
+    }
 }

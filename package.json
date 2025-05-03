@@ -1,7 +1,7 @@
 {
-  "name": "stihirus-reader",
-  "version": "1.2.0",
-  "description": "Fetches author profile information and poems from stihirus.ru",
+  "name": "@opexdevelop/stihirus-reader",
+  "version": "1.4.0",
+  "description": "Fetches author profile information, poems, and homepage data from stihirus.ru for Node.js",
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
@@ -12,7 +12,8 @@
     }
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "example": "node example.js"
   },
   "files": [
     "index.js",
@@ -20,6 +21,10 @@
     "LICENSE",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpexDevelop/stihirus-reader.git"
+  },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
     "node-fetch": "3.3.2"
@@ -34,8 +39,16 @@
     "author",
     "profile",
     "pagination",
-    "opex"
+    "opex",
+    "nodejs"
   ],
   "author": "t.me/OpexDev",
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/OpexDevelop/stihirus-reader/issues"
+  },
+  "homepage": "https://github.com/OpexDevelop/stihirus-reader#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  }
 }
