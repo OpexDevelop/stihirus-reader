@@ -4,77 +4,49 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'index.js'
-      - 'index.d.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'test/**'
-      - '.github/workflows/**'
   pull_request:
     branches:
       - main
-    paths:
-      - 'index.js'
-      - 'index.d.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'test/**'
-      - '.github/workflows/**'
   release:
-    types: [published] # Запускать при публикации релиза на GitHub
+    types: [published]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-    - name: Install dependencies
-      run: npm ci
-    - name: Run tests
-      run: npm test
-
-  publish-npm:
-    needs: build-and-test # Запускать только после успешных тестов
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published' # Запускать только при публикации релиза
-    steps:
       - uses: actions/checkout@v4
+      
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          registry-url: 'https://registry.npmjs.org' # Указываем реестр npm
+          cache: 'npm'
+          
       - name: Install dependencies
         run: npm ci
+        
+      - name: Run tests
+        run: npm test
+
+  publish-npm:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Install dependencies
+        run: npm ci
+        
       - name: Publish to npm
         run: npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Секрет с токеном npm
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  publish-gpr:
-    needs: build-and-test # Запускать только после успешных тестов
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published' # Запускать только при публикации релиза
-    permissions:
-      contents: read
-      packages: write # Даем права на запись в GitHub Packages
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          registry-url: 'https://npm.pkg.github.com' # Указываем реестр GitHub
-          scope: '@opexdevelop' # Указываем твою область видимости
-      - name: Install dependencies
-        run: npm ci
-      - name: Publish to GitHub Packages
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Используем встроенный токен GitHub
+
