@@ -1,7 +1,7 @@
 {
   "name": "@opexdevelop/stihirus-reader",
-  "version": "1.4.0",
-  "description": "Fetches author profile information, poems, and homepage data from stihirus.ru for Node.js",
+  "version": "1.6.0",
+  "description": "stihirus.ru parser",
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",

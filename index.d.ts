@@ -2,6 +2,7 @@ export interface StihirusAuthorStats {
     poems: number;
     reviewsSent: number;
     reviewsReceived: number;
+    subscribers: number;
 }
 
 export interface StihirusCollectionInfo {
@@ -45,7 +46,9 @@ export interface StihirusPoem {
     author?: {
         id: number;
         username: string;
+        uri?: string;
         profileUrl: string;
+        avatarUrl?: string | null;
     } | null;
 }
 
@@ -109,7 +112,6 @@ export type StihirusFiltersResponse = StihirusFiltersSuccessResponse | StihirusE
 
 export interface StihirusHomepageAuthor {
     username: string;
-    canonicalUsername: string;
     profileUrl: string;
     avatarUrl: string | null;
     poemsCount?: number | null;

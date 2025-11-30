@@ -1,4 +1,3 @@
-
 # StihiRus Reader / Парсер StihiRus
 
 [English](#english) | [Русский](#русский)
@@ -136,7 +135,7 @@ async function runNodeExample(identifier, page = null, delay = 500) {
 async function main() {
     const AUTHOR_IDENTIFIER = 'oreh-orehov'; // Or 14260, or URL like 'https://...'
     const PAGE_TO_FETCH = 1; // null = all pages, 0 = profile only, N > 0 = page N
-    const REQUEST_DELAY_MS = 500; // Delay between requests when fetching all pages
+    const REQUEST_DELAY_MS = 200; // Delay between requests when fetching all pages
 
     await runNodeExample(AUTHOR_IDENTIFIER, PAGE_TO_FETCH, REQUEST_DELAY_MS);
 }
@@ -152,7 +151,7 @@ Asynchronously fetches author profile and poem data.
 
 *   **`identifier`**: `string | number` - Author ID, username, subdomain URL, or path URL.
 *   **`page`**: `number | null` (Optional) - Controls poem fetching: `null` (all), `0` (profile only), `N > 0` (page N). Default: `null`.
-*   **`requestDelayMs`**: `number` (Optional) - Delay between API requests when fetching *all* pages (`page = null`). Default: `500`.
+*   **`requestDelayMs`**: `number` (Optional) - Delay between API requests when fetching *all* pages (`page = null`) sequentially (used only when filters are active, otherwise parallel fetching is used). Default: `200`.
 *   **`filterOptions`**: `StihirusFilterOptions | null` (Optional) - Object to filter poems: `{ rubricId?: number, year?: number, month?: number }`. Get available IDs/dates from `getAuthorFilters`. Default: `null`.
 *   **Returns**: `Promise<StihirusResponse>` - Check `status` field (`'success'` or `'error'`).
 
@@ -165,7 +164,7 @@ Asynchronously fetches available filter options (rubrics and dates) for an autho
 
 #### `getPoemById(poemId)`
 
-Asynchronously fetches data for a single poem by its ID by parsing its HTML page.
+Asynchronously fetches data for a single poem by its ID using the API.
 
 *   **`poemId`**: `number` - The unique ID of the poem.
 *   **Returns**: `Promise<StihirusSinglePoemResponse>` - Check `status` field (`'success'` or `'error'`).
@@ -183,9 +182,7 @@ These functions fetch data by parsing the `stihirus.ru` homepage.
 **Returned Object Structures:**
 
 ```typescript
-// See index.d.ts for detailed interface definitions:
-// StihirusAuthorData, StihirusPoem, StihirusAuthorFiltersData,
-// StihirusHomepageAuthor, StihirusHomepagePoem, StihirusError, etc.
+// See index.d.ts for detailed interface definitions.
 
 // Example StihirusPoem structure:
 interface StihirusPoem {
@@ -199,11 +196,17 @@ interface StihirusPoem {
   commentsCount: number;
   imageUrl: string | null;
   hasCertificate: boolean;
-  gifts: string[]; // e.g., ["proizv_like", "proizv_podarok1"]
+  gifts: string[]; // e.g. [] or ["proizv_podarok1"]
   uniquenessStatus: -1 | 0 | 1; // -1: checking, 0: not unique, 1: unique/certified
   contest?: { id: number; name: string } | null;
   holidaySection?: { id: number; url: string | null; title: string } | null;
-  author?: { id: number; username: string; profileUrl: string } | null; // Added by getPoemById
+  author?: {
+      id: number;
+      username: string;
+      uri?: string;
+      profileUrl: string;
+      avatarUrl?: string | null;
+  } | null;
 }
 
 // Example StihirusAuthorData structure:
@@ -217,7 +220,7 @@ interface StihirusAuthorData {
   headerUrl: string | null;
   status: string;
   lastVisit: string;
-  stats: { poems: number; reviewsSent: number; reviewsReceived: number };
+  stats: { poems: number; reviewsSent: number; reviewsReceived: number; subscribers: number };
   collections: { name: string; url: string }[];
   isPremium: boolean;
   poems: StihirusPoem[];
@@ -227,7 +230,7 @@ interface StihirusAuthorData {
 ### Important Notes
 
 *   **Unofficial:** Uses web scraping and internal APIs. Site changes may break it.
-*   **Rate Limiting:** Default 500ms delay between requests when fetching *all* poems (`page = null` in `getAuthorData`). Use responsibly.
+*   **Rate Limiting:** Default 200ms delay is used when fetching multiple pages sequentially (with filters). Parallel fetching is used for unrestricted downloads. Use responsibly.
 *   **Error Handling:** Returns `{ status: 'error', error: {...} }` for operational errors, does not throw them. Always check `status`.
 *   **Environment:** This library is designed for Node.js.
 
@@ -368,7 +371,7 @@ async function runNodeExample(identifier, page = null, delay = 500) {
 async function main() {
     const AUTHOR_IDENTIFIER = 'oreh-orehov'; // Или 14260, или URL
     const PAGE_TO_FETCH = 1; // null = все страницы, 0 = только профиль, N > 0 = страница N
-    const REQUEST_DELAY_MS = 500; // Задержка между запросами при получении всех страниц
+    const REQUEST_DELAY_MS = 200; // Задержка между запросами при получении всех страниц
 
     await runNodeExample(AUTHOR_IDENTIFIER, PAGE_TO_FETCH, REQUEST_DELAY_MS);
 }
@@ -384,7 +387,7 @@ main();
 
 *   **`identifier`**: `string | number` - ID автора, имя пользователя, URL поддомена или URL пути.
 *   **`page`**: `number | null` (Опционально) - Управляет загрузкой стихов: `null` (все), `0` (только профиль), `N > 0` (страница N). По умолчанию: `null`.
-*   **`requestDelayMs`**: `number` (Опционально) - Задержка между запросами API при загрузке *всех* страниц (`page = null`). По умолчанию: `500`.
+*   **`requestDelayMs`**: `number` (Опционально) - Задержка между запросами API при загрузке *всех* страниц (`page = null`) последовательно (используется только при активных фильтрах, иначе используется параллельная загрузка). По умолчанию: `200`.
 *   **`filterOptions`**: `StihirusFilterOptions | null` (Опционально) - Объект для фильтрации стихов: `{ rubricId?: number, year?: number, month?: number }`. Доступные ID/даты можно получить через `getAuthorFilters`. По умолчанию: `null`.
 *   **Возвращает**: `Promise<StihirusResponse>` - Проверьте поле `status` (`'success'` или `'error'`).
 
@@ -397,7 +400,7 @@ main();
 
 #### `getPoemById(poemId)`
 
-Асинхронно получает данные одного стихотворения по его ID путем парсинга его HTML-страницы.
+Асинхронно получает данные одного стихотворения по его ID используя API.
 
 *   **`poemId`**: `number` - Уникальный ID стихотворения.
 *   **Возвращает**: `Promise<StihirusSinglePoemResponse>` - Проверьте поле `status` (`'success'` или `'error'`).
@@ -415,9 +418,7 @@ main();
 **Структуры возвращаемых объектов:**
 
 ```typescript
-// Смотрите index.d.ts для детальных определений интерфейсов:
-// StihirusAuthorData, StihirusPoem, StihirusAuthorFiltersData,
-// StihirusHomepageAuthor, StihirusHomepagePoem, StihirusError, и т.д.
+// Смотрите index.d.ts для детальных определений интерфейсов.
 
 // Пример структуры StihirusPoem:
 interface StihirusPoem {
@@ -431,11 +432,17 @@ interface StihirusPoem {
   commentsCount: number;
   imageUrl: string | null;
   hasCertificate: boolean;
-  gifts: string[]; // напр., ["proizv_like", "proizv_podarok1"]
+  gifts: string[]; // напр. [] или ["proizv_podarok1"]
   uniquenessStatus: -1 | 0 | 1; // -1: проверка, 0: неуникально, 1: уникально/сертификат
   contest?: { id: number; name: string } | null;
   holidaySection?: { id: number; url: string | null; title: string } | null;
-  author?: { id: number; username: string; profileUrl: string } | null; // Добавляется getPoemById
+  author?: {
+      id: number;
+      username: string;
+      uri?: string;
+      profileUrl: string;
+      avatarUrl?: string | null;
+  } | null;
 }
 
 // Пример структуры StihirusAuthorData:
@@ -449,7 +456,7 @@ interface StihirusAuthorData {
   headerUrl: string | null;
   status: string;
   lastVisit: string;
-  stats: { poems: number; reviewsSent: number; reviewsReceived: number };
+  stats: { poems: number; reviewsSent: number; reviewsReceived: number; subscribers: number };
   collections: { name: string; url: string }[];
   isPremium: boolean;
   poems: StihirusPoem[];
@@ -459,7 +466,7 @@ interface StihirusAuthorData {
 ### Важные замечания
 
 *   **Неофициальный:** Использует веб-скрапинг и внутренние API. Изменения на сайте могут сломать модуль.
-*   **Ограничение запросов:** Задержка 500мс по умолчанию между запросами при получении *всех* стихов (`page = null` в `getAuthorData`). Используйте ответственно.
+*   **Ограничение запросов:** Задержка 200мс по умолчанию используется при последовательной загрузке всех страниц (с фильтрами). Параллельная загрузка используется для скачивания без ограничений. Используйте ответственно.
 *   **Обработка ошибок:** Возвращает `{ status: 'error', error: {...} }` при операционных ошибках, не выбрасывает их. Всегда проверяйте `status`.
 *   **Среда выполнения:** Библиотека предназначена для Node.js.
 
