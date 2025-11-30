@@ -1,6 +1,6 @@
 {
   "name": "@opexdevelop/stihirus-reader",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "stihirus.ru parser",
   "type": "module",
   "main": "index.js",
